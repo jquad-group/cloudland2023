@@ -1,0 +1,58 @@
+apiVersion: pipeline.jquad.rocks/v1alpha1
+kind: PipelineTrigger
+metadata:
+  name: test-application-pr
+spec:
+  source:
+    kind: PullRequest
+    name: test-application
+  pipelineRunSpec:
+    pipelineRef:
+      name: pullrequest-pipeline-go
+    serviceAccountName: build-robot
+    podTemplate:
+      securityContext:
+        fsGroup: 0
+        runAsGroup: 0
+        runAsUser: 0    
+    workspaces:
+    - name: workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 128Mi
+          volumeMode: Filesystem
+    params:
+    - name: repositoryName
+      value: test-application
+    - name: pathToContext
+      value: /workspace/repo
+    - name: commit
+      value: ""
+    - name: branch-name
+      value: $.head.ref
+    - name: repo-url
+      value: git@github.com:jquad-group/test-application.git
+    - name: repo-url-alternate
+      value: git@github.com:jquad-group/test-application.git
+    - name: gitrevision
+      value: $.head.ref
+    - name: projectname
+      value: test-application
+    - name: statusUrl
+      value: $.statuses_url
+    - name: state
+      value: success
+    - name: targetUrl
+      value: https://rancher.jquad.rocks/k8s/clusters/local/api/v1/namespaces/tekton-pipelines/services/http:tekton-dashboard:9097/proxy/#/pipelineruns
+    - name: context
+      value: jquad-group/tekton-ci    
+    - name: githubSecretName
+      value: git-clone
+    - name: githubUsernameKey
+      value: username
+    - name: githubPasswordKey
+      value: password        
