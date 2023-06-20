@@ -11,7 +11,7 @@ The directory structure is as follows:
 
 1. Prerequisites
 
-Flux and Tekton have to be installed on your kubernetes cluster. 
+    Flux and Tekton have to be installed on your kubernetes cluster. 
 
 2. Install the additional operators
 
