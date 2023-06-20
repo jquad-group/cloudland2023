@@ -1,0 +1,771 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: git-clone
+  annotations:
+    tekton.dev/git-0: github.com
+type: kubernetes.io/ssh-auth
+stringData:
+  # needed to check for new pull requests and to set the github status  
+  accessToken: MY_ACCESS_TOKEN
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: build-robot
+secrets:
+  - name: git-clone
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: pullrequest-pipeline-go
+spec:
+  finally:
+  - name: github-commit-status-error
+    params:
+    - name: statusUrl
+      value: $(params.statusUrl)
+    - name: description
+      value: $(params.descriptionError)
+    - name: state
+      value: $(params.stateError)
+    - name: targetUrl
+      value: $(params.targetUrl)
+    - name: context
+      value: $(params.context)
+    - name: secretName
+      value: $(params.githubSecretName)
+    - name: accessTokenKey
+      value: $(params.githubAccessTokenKey)
+    taskRef:
+      kind: Task
+      name: github-commit-status
+    when:
+    - input: $(tasks.build-and-test-task-go.status)
+      operator: in
+      values:
+      - Failed
+  - name: github-commit-status-success
+    params:
+    - name: statusUrl
+      value: $(params.statusUrl)
+    - name: description
+      value: $(params.descriptionSuccess)
+    - name: state
+      value: $(params.stateSuccess)
+    - name: targetUrl
+      value: $(params.targetUrl)
+    - name: context
+      value: $(params.context)
+    - name: secretName
+      value: $(params.githubSecretName)
+    - name: accessTokenKey
+      value: $(params.githubAccessTokenKey)
+    taskRef:
+      kind: Task
+      name: github-commit-status
+    when:
+    - input: $(tasks.build-and-test-task-go.status)
+      operator: in
+      values:
+      - Succeeded
+  params:
+  - name: repo-url
+    type: string
+  - default: ""
+    description: The git repository URL to clone from.
+    name: repo-url-alternate
+    type: string
+  - description: The git branch to clone.
+    name: branch-name
+    type: string
+  - description: the git project owner
+    name: owner
+    type: string    
+  - description: the git project repository
+    name: repository
+    type: string
+  - description: The build context used by Kaniko
+    name: pathToContext
+    type: string
+  - default: ""
+    description: subdirectory
+    name: subdirectory
+    type: string
+  - name: statusUrl
+    type: string
+  - default: pending
+    name: statePending
+    type: string
+  - default: The build was successfull.
+    name: descriptionSuccess
+    type: string
+  - default: success
+    name: stateSuccess
+    type: string
+  - default: error
+    name: stateError
+    type: string
+  - default: The build has failed.
+    name: descriptionError
+    type: string
+  - default: The build is currently running.
+    name: descriptionPending
+    type: string
+  - default: http://localhost:9097
+    name: targetUrl
+    type: string
+  - default: cloudland2023/tekton-ci
+    name: context
+    type: string
+  - name: githubSecretName
+    type: string
+  - name: githubAccessTokenKey
+    type: string
+  tasks:
+  - name: clone
+    params:
+    - name: url
+      value: $(params.repo-url)
+    - name: url-alternate
+      value: $(params.repo-url-alternate)
+    - name: revision
+      value: $(params.branch-name)
+    - name: refspec
+      value: +refs/tags/*:refs/tags/* +refs/heads/*:refs/heads/*
+    - name: deleteExisting
+      value: "true"
+    - name: sslVerify
+      value: "false"
+    - name: depth
+      value: "1"
+    - name: subdirectory
+      value: $(params.subdirectory)
+    taskRef:
+      kind: Task
+      name: git-clone
+    workspaces:
+    - name: repo
+      workspace: workspace
+  - name: github-commit-status-pending
+    params:
+    - name: statusUrl
+      value: $(params.statusUrl)
+    - name: description
+      value: $(params.descriptionPending)
+    - name: state
+      value: $(params.statePending)
+    - name: targetUrl
+      value: $(params.targetUrl)
+    - name: context
+      value: $(params.context)
+    - name: secretName
+      value: $(params.githubSecretName)
+    - name: accessTokenKey
+      value: $(params.githubAccessTokenKey)
+    runAfter:
+    - clone
+    taskRef:
+      kind: Task
+      name: github-commit-status
+  - name: build-and-test-task-go
+    runAfter:
+    - github-commit-status-pending
+    taskRef:
+      kind: Task
+      name: build-and-test-task-go
+    workspaces:
+    - name: repo
+      workspace: workspace
+  workspaces:
+  - name: workspace
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: release-pipeline-go
+spec:
+  finally:
+  - name: github-commit-status-error
+    params:
+    - name: statusUrl
+      value: https://api.github.com/repos/$(params.owner)/$(params.repository)/statuses/$(params.statusUrl)
+    - name: description
+      value: $(params.descriptionError)
+    - name: state
+      value: $(params.stateError)
+    - name: targetUrl
+      value: $(params.targetUrl)
+    - name: context
+      value: $(params.context)
+    - name: secretName
+      value: $(params.githubSecretName)
+    - name: accessTokenKey
+      value: $(params.githubAccessTokenKey)
+    taskRef:
+      kind: Task
+      name: github-commit-status
+    when:
+    - input: $(tasks.build-and-test-task-go.status)
+      operator: in
+      values:
+      - Failed
+  - name: github-commit-status-success
+    params:
+    - name: statusUrl
+      value: https://api.github.com/repos/$(params.owner)/$(params.repository)/statuses/$(params.statusUrl)
+    - name: description
+      value: $(params.descriptionSuccess)
+    - name: state
+      value: $(params.stateSuccess)
+    - name: targetUrl
+      value: $(params.targetUrl)
+    - name: context
+      value: $(params.context)
+    - name: secretName
+      value: $(params.githubSecretName)
+    - name: accessTokenKey
+      value: $(params.githubAccessTokenKey)
+    taskRef:
+      kind: Task
+      name: github-commit-status
+    when:
+    - input: $(tasks.build-and-test-task-go.status)
+      operator: in
+      values:
+      - Succeeded
+  params:
+  - name: repo-url
+    type: string
+  - default: ""
+    description: The git repository URL to clone from.
+    name: repo-url-alternate
+    type: string
+  - description: The git branch to clone.
+    name: branch-name
+    type: string
+  - description: the git repository owner
+    name: owner
+    type: string    
+  - description: the git repository name
+    name: repository
+    type: string
+  - description: the name of the image
+    name: imageRepositoryName
+    type: string
+  - description: the tag of the image
+    name: imageTag
+    type: string
+  - description: latest commit id
+    name: commit
+    type: string
+  - description: Location where the resulting docker image will be pushed to
+    name: imageLocation
+    type: string
+  - description: The path to the build context, used by Kaniko - within the workspace
+    name: pathToDockerFile
+    type: string
+  - description: The build context used by Kaniko
+    name: pathToContext
+    type: string
+  - default: ""
+    description: subdirectory
+    name: subdirectory
+    type: string
+  - name: statusUrl
+    type: string
+  - default: pending
+    name: statePending
+    type: string
+  - default: The build was successfull.
+    name: descriptionSuccess
+    type: string
+  - default: success
+    name: stateSuccess
+    type: string
+  - default: error
+    name: stateError
+    type: string
+  - default: The build has failed.
+    name: descriptionError
+    type: string
+  - default: The build is currently running.
+    name: descriptionPending
+    type: string
+  - default: https://localhost:9097
+    name: targetUrl
+    type: string
+  - default: cloudland2023/tekton-ci
+    name: context
+    type: string
+  - name: githubSecretName
+    type: string
+  - name: githubAccessTokenKey
+    type: string    
+  tasks:
+  - name: clone
+    params:
+    - name: url
+      value: $(params.repo-url)
+    - name: url-alternate
+      value: $(params.repo-url-alternate)
+    - name: revision
+      value: $(params.branch-name)
+    - name: refspec
+      value: +refs/tags/*:refs/tags/* +refs/heads/*:refs/heads/*
+    - name: deleteExisting
+      value: "true"
+    - name: sslVerify
+      value: "false"
+    - name: depth
+      value: "10000"
+    - name: subdirectory
+      value: $(params.subdirectory)
+    taskRef:
+      kind: Task
+      name: git-clone
+    workspaces:
+    - name: repo
+      workspace: workspace
+  - name: github-commit-status-pending
+    params:
+    - name: statusUrl
+      value: https://api.github.com/repos/$(params.owner)/$(params.repository)/statuses/$(params.statusUrl)
+    - name: description
+      value: $(params.descriptionPending)
+    - name: state
+      value: $(params.statePending)
+    - name: targetUrl
+      value: $(params.targetUrl)
+    - name: context
+      value: $(params.context)
+    - name: secretName
+      value: $(params.githubSecretName)
+    - name: accessTokenKey
+      value: $(params.githubAccessTokenKey)
+    runAfter:
+    - clone
+    taskRef:
+      kind: Task
+      name: github-commit-status      
+  - name: build-and-test-task-go
+    runAfter:
+    - github-commit-status-pending
+    taskRef:
+      kind: Task
+      name: build-and-test-task-go
+    workspaces:
+    - name: repo
+      workspace: workspace
+  - name: set-git-version
+    params:
+    - name: branch
+      value: $(params.branch-name)
+    runAfter:
+    - build-and-test-task-go
+    taskRef:
+      kind: Task
+      name: git-version
+    workspaces:
+    - name: repo
+      workspace: workspace
+  - name: assemble-and-push
+    params:
+    - name: imageLocation
+      value: $(params.imageLocation)
+    - name: imageRepositoryName
+      value: $(params.imageRepositoryName)
+    - name: imageTag
+      value: $(tasks.set-git-version.results.packageVersion)
+    - name: timestamp
+      value: latest
+    - name: pathToDockerFile
+      value: $(params.pathToDockerFile)
+    - name: pathToContext
+      value: $(params.pathToContext)
+    runAfter:
+    - set-git-version
+    taskRef:
+      kind: Task
+      name: assemble-and-push-task-ws
+    workspaces:
+    - name: repo
+      workspace: workspace
+  workspaces:
+  - name: workspace
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: assemble-and-push-task-ws
+spec:
+  params:
+  - name: imageRepositoryName
+    type: string
+  - name: imageTag
+    type: string
+  - name: timestamp
+    type: string
+  - description: Location where the resulting docker image will be pushed to
+    name: imageLocation
+    type: string
+  - default: /workspace/repo/Dockerfile
+    description: The path to the dockerfile to build
+    name: pathToDockerFile
+    type: string
+  - default: /workspace/repo
+    description: The build context used by Kaniko (https://github.com/GoogleContainerTools/kaniko#kaniko-build-contexts)
+    name: pathToContext
+    type: string
+  steps:
+  - script: |-
+      cd /workspace/repo
+      echo "Building container image..."
+      echo "Built!"
+      echo "Pushing container image..."
+      echo "Pushed!"
+    image: alpine:latest
+    imagePullPolicy: IfNotPresent
+    name: assemble-and-push
+    resources:
+      limits:
+        cpu: 250m
+        memory: 6Gi
+      requests:
+        cpu: 150m
+        memory: 4Gi
+  workspaces:
+  - name: repo
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-and-test-task-go
+spec:
+  steps:
+  - image: golang:1.19.3
+    imagePullPolicy: IfNotPresent
+    name: test
+    script: |-
+      cd /workspace/repo
+      make test
+  - image: golang:1.19.3
+    imagePullPolicy: IfNotPresent
+    name: build
+    script: "cd /workspace/repo\nmake        "
+  workspaces:
+  - name: repo
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: get-current-timestamp
+spec:
+  results:
+  - description: unixtimestamp
+    name: unix
+  - description: yyyy-mm-dd.hhmmss
+    name: readable
+  - description: yyyymmddhhmmss
+    name: short
+  - description: custom
+    name: custom
+  steps:
+  - image: alpine:latest
+    imagePullPolicy: IfNotPresent
+    name: get-current-timestamp
+    script: |-
+      UNIX=$(date +%s)
+      echo -n $UNIX > $(results.unix.path)
+      date +%F.%H:%M:%S | tr -d '\n' > $(results.readable.path)
+      date +%Y%m%d%H%M%S | tr -d '\n' > $(results.short.path)
+      date +%s | tr -d '\n' > $(results.custom.path)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-clone
+spec:
+  params:
+  - description: git https or ssh url to clone
+    name: url
+    type: string
+  - default: ""
+    description: git https or ssh url to clone if not provided, url is used as default
+    name: url-alternate
+    type: string
+  - default: master
+    description: git revision to checkout (branch, tag, sha, refÔÇª)
+    name: revision
+    type: string
+  - default: ""
+    description: (optional) git refspec to fetch before checking out revision
+    name: refspec
+  - default: "false"
+    description: defines if the resource should initialize and fetch the submodules
+    name: submodules
+    type: string
+  - default: "1"
+    description: performs a shallow clone where only the most recent commit(s) will
+      be fetched
+    name: depth
+    type: string
+  - default: "true"
+    description: defines if http.sslVerify should be set to true or false in the global
+      git config
+    name: sslVerify
+    type: string
+  - default: ""
+    description: subdirectory inside the "output" workspace to clone the git repo
+      into
+    name: subdirectory
+    type: string
+  - default: "false"
+    description: clean out the contents of the repo's destination directory (if it
+      already exists) before trying to clone the repo there
+    name: deleteExisting
+    type: string
+  - default: ""
+    description: git HTTP proxy server for non-SSL requests
+    name: httpProxy
+    type: string
+  - default: ""
+    description: git HTTPS proxy server for SSL requests
+    name: httpsProxy
+    type: string
+  - default: ""
+    description: git no proxy - opt out of proxying HTTP/HTTPS requests
+    name: noProxy
+    type: string
+  - default: gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.37.0
+    description: The image used where the git-init binary is.
+    name: gitInitImage
+    type: string
+  results:
+  - description: The precise commit SHA that was fetched by this Task
+    name: commit
+  - description: The final execution status should be "Succeeded", can be replaced
+      in > tekton v20.x
+    name: status
+  - description: the pid set by the first step
+    name: lock-pid
+  steps:
+  - image: $(params.gitInitImage)
+    imagePullPolicy: Always
+    name: clone
+    script: |-
+      # check if given alternate url starts with https
+      URL="$(params.url)"
+      if  echo "$(params.url-alternate)" | grep -E "^[[:blank:]]*http[s]{0,1}://.+$" ; then
+        URL="$(params.url-alternate)"
+      fi
+
+      if  echo "$URL" | grep -v -E "^[[:blank:]]*http[s]{0,1}://.+$" ; then
+        echo "Provide a valid https URI, either in url or in url-alternate"
+      fi
+
+      CHECKOUT_DIR="$(workspaces.repo.path)/$(params.subdirectory)"
+
+      # Locks
+      TARGETDIR="$(workspaces.repo.path)"
+      LOCKFOLDER=$TARGETDIR/.lock
+      PIDFILE=$LOCKFOLDER/.pid
+      LOGFILE=log
+      deleteLock(){
+          pid=$(cat $(results.lock-pid.path))
+          content=$(cat $PIDFILE)
+          if [ "$pid" == "$content" ];then
+              echo "deleting lock"
+              rm -rf $LOCKFOLDER;
+          fi
+      }
+
+      # For exit not applicable in this use case
+      #trapfunctions
+      trap_exit() {
+          echo "trapping exit signal" >&2
+          deleteLock
+      }
+      trap_int() {
+          echo "trapping int signal" >&2
+          deleteLock
+          exit 1
+      }
+      trap_term() {
+          echo "trapping term signal" >&2
+          deleteLock
+          exit 3
+      }
+      #
+      #
+      trap trap_exit EXIT
+      trap trap_int  INT
+      trap trap_term  TERM
+
+      aquireLock(){
+        mkdir -pv $TARGETDIR
+        let i=1
+        while ! mkdir $LOCKFOLDER ; do
+            echo "waiting"
+            sleep $i
+            let i+=2;
+            if $i >= 60 ; then
+              # don't wait indefinitely
+              exit 4
+            fi
+        done
+
+        PID=$(context.taskRun.uid)
+        echo "aquired Lock"
+        echo $PID > $PIDFILE
+        echo $PID > $(results.lock-pid.path)
+        echo $PID
+        touch $LOCKFOLDER
+      }
+
+
+      cleandir() {
+        # Delete any existing contents of the repo directory if it exists.
+        #
+        # We don't just "rm -rf $CHECKOUT_DIR" because $CHECKOUT_DIR might be "/"
+        # or the root of a mounted volume.
+        if [[ -d "$CHECKOUT_DIR" ]] ; then
+          # Delete non-hidden files and directories
+          rm -rf "$CHECKOUT_DIR"/*
+          # Delete files and directories starting with . but excluding .. and .lock
+          rm -rf  $CHECKOUT_DIR/.[!.]*[!lock]*
+          # Delete files and directories starting with .. plus any other character
+          rm -rf "$CHECKOUT_DIR"/..?*
+        fi
+      }
+
+      aquireLock
+
+      if [[ "$(params.deleteExisting)" == "true" ]] ; then
+        cleandir
+      fi
+      test -z "$(params.httpProxy)" || export HTTP_PROXY=$(params.httpProxy)
+      test -z "$(params.httpsProxy)" || export HTTPS_PROXY=$(params.httpsProxy)
+      test -z "$(params.noProxy)" || export NO_PROXY=$(params.noProxy)
+      /ko-app/git-init \
+        -url "$URL" \
+        -revision "$(params.revision)" \
+        -refspec "$(params.refspec)" \
+        -path "$CHECKOUT_DIR" \
+        -sslVerify="$(params.sslVerify)" \
+        -submodules="$(params.submodules)" \
+        -depth "$(params.depth)"
+      cd "$CHECKOUT_DIR"
+      RESULT_SHA="$(git rev-parse HEAD | tr -d '\n')"
+
+      EXIT_CODE="$?"
+      # deleted by trap
+      # deleteLock
+      if [ "$EXIT_CODE" != 0 ]
+      then
+        exit $EXIT_CODE
+      fi
+      # Make sure we don't add a trailing newline to the result!
+      echo -n "$RESULT_SHA" > $(results.commit.path)
+  workspaces:
+  - description: The git repo will be cloned onto the volume backing this workspace
+    name: repo
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  annotations:
+    tekton.dev/categories: Git
+    tekton.dev/displayName: git version
+    tekton.dev/pipelines.minVersion: 0.12.0
+    tekton.dev/platforms: linux/amd64
+    tekton.dev/tags: git
+  labels:
+    app.kubernetes.io/version: "0.1"
+  name: git-version
+spec:
+  description: This task can be used to create a version from git history
+  params:
+  - description: branch to checkout to create a version for e.g. "develop"
+    name: branch
+    type: string
+  results:
+  - description: The calculated git version you could use for git tagging e.g. "0.1.0-tektonize.1-188"
+    name: gitVersion
+  - description: A normalized version for use in container images e.g. "0.1.0-tektonize.1-188"
+    name: packageVersion
+  steps:
+  - env:
+    - name: PARAM_BRANCH
+      value: $(params.branch)
+    image: mcr.microsoft.com/dotnet/sdk:6.0
+    name: set-git-version
+    script: |-
+      #!/usr/bin/env bash
+      export PATH="$PATH:/tekton/home/.dotnet/tools"
+      dotnet tool install GitVersion.Tool --version 5.10.3 --tool-path "/tekton/home/.dotnet/tools"
+
+      cd /workspace/repo
+      git fetch --unshallow --all
+      #git checkout "${PARAM_BRANCH}"
+
+      export GITVERSION=$(dotnet gitversion /showvariable FullSemVer /overrideconfig mode=Mainline)
+      echo -n "${GITVERSION}" | tee $(results.gitVersion.path)
+
+      # normalize a bit because
+      # image tags can only contain `abcdefghijklmnopqrstuvwxyz0123456789_-.ABCDEFGHIJKLMNOPQRSTUVWXYZ`
+      export PACKAGEVERSION=$(echo -n $GITVERSION | sed 's/[^-._0-9A-Za-z]/-/g')
+      echo -n "${PACKAGEVERSION}" | tee $(results.packageVersion.path)
+    securityContext:
+      runAsUser: 0
+  workspaces:
+  - name: repo
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: github-commit-status
+spec:
+  params:
+  - name: statusUrl
+    type: string
+  - default: success
+    name: state
+    type: string
+  - name: description
+    type: string
+  - default: http://localhost:9097/#/
+    name: targetUrl
+    type: string
+  - default: cloudland2023/tekton-ci
+    name: context
+    type: string
+  - name: secretName
+    type: string
+  - default: accessToken
+    name: accessTokenKey
+    type: string
+  steps:
+  - env:
+    - name: GITHUB_ACCESS_TOKEN
+      valueFrom:
+        secretKeyRef:
+          key: $(params.accessTokenKey)
+          name: $(params.secretName)
+    image: alpine/curl:latest
+    imagePullPolicy: Always
+    name: set-github-commit-status
+    script: |-
+      curl \
+      -i \
+      -X \
+      POST \
+      -H \
+      "Accept: application/vnd.github.v3+json" \
+      -H \
+      "Authorization: Bearer ${GITHUB_ACCESS_TOKEN}" \
+      $(params.statusUrl) \
+      -d \
+      "{\"state\":\"$(params.state)\",\"target_url\":\"$(params.targetUrl)\",\"description\":\"$(params.description)\",\"context\":\"$(params.context)\"}"

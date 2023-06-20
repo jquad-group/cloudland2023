@@ -1,16 +1,16 @@
 apiVersion: pipeline.jquad.rocks/v1alpha1
 kind: PullRequest
 metadata:
-  name: test-application
+  name: cloudland2023
 spec:
   gitProvider:
     provider: Github
     secretRef: git-clone
     insecureSkipVerify: false
     github:
-      url: https://github.com/jquad-group/test-application.git
+      url: https://github.com/jquad-group/cloudland2023.git
       owner: jquad-group
-      repository: test-application
+      repository: cloudland2023
   targetBranch: 
     name: refs/heads/main
   interval: 1m

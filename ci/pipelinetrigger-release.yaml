@@ -1,11 +1,11 @@
 apiVersion: pipeline.jquad.rocks/v1alpha1
 kind: PipelineTrigger
 metadata:
-  name: test-application-release
+  name: cloudland2023-release
 spec:
   source:
     kind: GitRepository
-    name: test-application
+    name: cloudland2023
   pipelineRunSpec:
     pipelineRef:
       name: release-pipeline-go
@@ -27,11 +27,11 @@ spec:
           volumeMode: Filesystem              
     params:
     - name: imageLocation
-      value: harbor.jquad.rocks/library
+      value: harbor-core.harbor.svc.cluster.local/library
     - name: imageTag
       value: ""
-    - name: repositoryName
-      value: test-application
+    - name: imageRepositoryName
+      value: cloudland2023
     - name: pathToContext
       value: /workspace/repo
     - name: pathToDockerFile
@@ -41,24 +41,24 @@ spec:
     - name: branch-name
       value: main
     - name: repo-url
-      value: git@github.com:jquad-group/test-application.git
+      value: git@github.com:jquad-group/cloudland2023.git
     - name: repo-url-alternate
-      value: git@github.com:jquad-group/test-application.git
+      value: git@github.com:jquad-group/cloudland2023.git
     - name: gitrevision
       value: main
-    - name: projectname
-      value: test-application
+    - name: owner
+      value: jquad-group
+    - name: repository
+      value: cloudland2023
     - name: statusUrl
       value: $.commitId
     - name: state
       value: success
     - name: targetUrl
-      value: https://rancher.jquad.rocks/k8s/clusters/local/api/v1/namespaces/tekton-pipelines/services/http:tekton-dashboard:9097/proxy/#/pipelineruns
+      value: http://localhost:9097/#/pipelineruns
     - name: context
-      value: jquad-group/tekton-ci    
+      value: cloudland2023/tekton-ci    
     - name: githubSecretName
       value: git-clone
-    - name: githubUsernameKey
-      value: username
-    - name: githubPasswordKey
-      value: password      
+    - name: githubAccessTokenKey
+      value: accessToken
