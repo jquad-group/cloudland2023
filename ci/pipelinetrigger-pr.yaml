@@ -33,9 +33,9 @@ spec:
     - name: branch-name
       value: $.head.ref
     - name: repo-url
-      value: git@github.com:jquad-group/cloudland2023.git
+      value: https://github.com/jquad-group/cloudland2023.git
     - name: repo-url-alternate
-      value: git@github.com:jquad-group/cloudland2023.git
+      value: https://github.com/jquad-group/cloudland2023.git
     - name: gitrevision
       value: $.head.ref
     - name: owner

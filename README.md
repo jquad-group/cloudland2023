@@ -30,18 +30,19 @@ kubectl apply -f https://github.com/jquad-group/pipeline-trigger-operator/releas
 
     ![Token](https://github.com/jquad-group/cloudland2023/blob/main/tekton/img/github_token_permissions.png)
 
-4. Replace the string `MY_ACCESS_TOKEN` in https://github.com/jquad-group/cloudland2023/blob/main/tekton/pipeline.yaml#L11 with your newly created token from `3.` 
+4. Replace the string `MY_ACCESS_TOKEN` in https://github.com/jquad-group/cloudland2023/blob/main/tekton/pipeline.yaml#L10 with your newly created token from `3.` 
 
-5. Deploy the example pipeline
+5. Create the `pipeline-demo` namespace and deploy the example pipeline
 
 ```
-kubectl apply -f ./tekton/pipeline.yaml
+kubectl create ns pipeline-demo
+kubectl apply -f ./tekton/pipeline.yaml -n pipeline-demo
 ```
 
 6. Deploy everything in the ci directory
 
 ```
-kubectl apply -f ./ci
+kubectl apply -f ./ci -n pipeline-demo
 ```
 
 7. Observe how it works by creating new pull requests and/or new commits

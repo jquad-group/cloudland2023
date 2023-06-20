@@ -5,7 +5,6 @@ metadata:
   name: git-clone
   annotations:
     tekton.dev/git-0: github.com
-type: kubernetes.io/ssh-auth
 stringData:
   # needed to check for new pull requests and to set the github status  
   accessToken: MY_ACCESS_TOKEN
