@@ -4,7 +4,7 @@ This repository contains a simple go application.
 
 The directory structure is as follows:
 - `ci` - manifests needed for creating the pipeline workflow
-- `tekton` - an example tekton pipeline, which is referenced from the files in `ci` 
+- `tekton` - an example tekton pipeline, which is referenced in the files from the `ci` directory
 
 
 # How to try the demo?
@@ -39,7 +39,7 @@ kubectl create ns pipeline-demo
 kubectl apply -f ./tekton/pipeline.yaml -n pipeline-demo
 ```
 
-6. Deploy everything in the ci directory
+6. Deploy everything from the `ci` directory
 
 ```
 kubectl apply -f ./ci -n pipeline-demo
