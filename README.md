@@ -1,6 +1,6 @@
 # Cloud Land 2023
 
-This repository contains a simple go application.. 
+This repository contains a simple go application!
 
 The directory structure is as follows:
 - `ci` - manifests needed for creating the pipeline workflow
